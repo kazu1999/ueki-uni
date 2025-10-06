@@ -1,0 +1,119 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+:root {
+  --bg: #ffffff;
+  --panel: #f8fafc;
+  --text: #111827;
+  --muted: #6b7280;
+  --user: #2563eb;
+  --assistant: #e5e7eb;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  color: var(--text);
+}
+
+h1 {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+
+.controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.controls input[type="tel"] {
+  background: var(--panel);
+  border: 1px solid #1f2937;
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+}
+
+.messages {
+  background: var(--panel);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.message {
+  display: flex;
+}
+.message.user {
+  justify-content: flex-end;
+}
+.message.assistant {
+  justify-content: flex-start;
+}
+.bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+}
+.message.user .bubble {
+  background: var(--user);
+  color: white;
+}
+.message.assistant .bubble {
+  background: var(--assistant);
+  color: #111827;
+}
+
+.composer {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+.composer textarea {
+  flex: 1;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.actions button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.actions button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: #fca5a5;
+  margin: 8px 0;
+}
+
+
