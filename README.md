@@ -45,6 +45,8 @@ npm run dev -- --host
 
 ベース URL は `VITE_API_BASE_URL`（推奨）または `/api`（開発プロキシ）を使用します。
 
+- `GET /prompt`（システムプロンプト取得、Markdown）
+- `PUT /prompt`（システムプロンプト更新、body: `{ "content": string }`）
 - `POST /chat`
 - `GET /calls`
 - `GET /phones`
@@ -55,6 +57,23 @@ npm run dev -- --host
 - `DELETE /faq/{question}`
 
 詳細は `chat_api/aws.md` を参照してください。
+
+## プロンプト（Markdown）運用
+
+- システムプロンプトは DynamoDB `ueki-prompts` に Markdown で保存され、`/chat` 呼び出し時に読み込まれます。
+- 一時的にローカルから更新する場合は以下の例を利用できます（AWS 環境に対して直接更新）。
+
+```
+EP=https://so0hxmjon8.execute-api.ap-northeast-1.amazonaws.com
+
+# 取得
+curl -s "$EP/prompt" | jq .
+
+# 更新
+curl -s -X PUT "$EP/prompt" \
+  -H 'content-type: application/json' \
+  -d '{"content":"# System Prompt\n\n- Markdown で管理\n"}' | jq .
+```
 
 ## ディレクトリ
 

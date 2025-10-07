@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, Route, Routes } from 'react-router-dom'
 import ChatPage from './pages/Chat'
 import CallLogsPage from './pages/CallLogs'
 import FaqPage from './pages/Faq'
+import PromptPage from './pages/Prompt'
 
 function Layout() {
   return (
@@ -15,6 +16,7 @@ function Layout() {
           <NavLink to="/chat">Chat</NavLink>
           <NavLink to="/call-logs">Call Logs</NavLink>
           <NavLink to="/faq">FAQ</NavLink>
+          <NavLink to="/prompt">Prompt</NavLink>
         </nav>
       </aside>
       <main style={{ padding: 16 }}>
@@ -32,6 +34,7 @@ export default function App() {
         <Route path="chat" element={<ChatPage />} />
         <Route path="call-logs" element={<CallLogsPage />} />
         <Route path="faq" element={<FaqPage />} />
+        <Route path="prompt" element={<PromptPage />} />
         <Route path="*" element={<div>Not Found</div>} />
       </Route>
     </Routes>
