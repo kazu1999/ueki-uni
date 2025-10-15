@@ -9,6 +9,7 @@ export type ChatResponse = {
 export async function postChat(params: {
   phoneNumber: string
   userText: string
+  callSid?: string
   signal?: AbortSignal
 }): Promise<ChatResponse> {
   const base = getApiBase()
@@ -18,6 +19,7 @@ export async function postChat(params: {
     body: JSON.stringify({
       phone_number: params.phoneNumber,
       user_text: params.userText,
+      ...(params.callSid ? { call_sid: params.callSid } : {}),
     }),
     signal: params.signal,
   })

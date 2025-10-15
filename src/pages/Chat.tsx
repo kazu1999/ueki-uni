@@ -10,6 +10,7 @@ type Message = {
 
 export default function ChatPage() {
   const [phone, setPhone] = useState('')
+  const [callSid, setCallSid] = useState('')
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [isSending, setIsSending] = useState(false)
@@ -17,8 +18,8 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null)
 
   const canSend = useMemo(() => {
-    return phone.trim().length > 0 && input.trim().length > 0 && !isSending
-  }, [phone, input, isSending])
+    return phone.trim().length > 0 && callSid.trim().length > 0 && input.trim().length > 0 && !isSending
+  }, [phone, callSid, input, isSending])
 
   const onSend = useCallback(async () => {
     if (!canSend) return
@@ -34,7 +35,7 @@ export default function ChatPage() {
     const ac = new AbortController()
     abortRef.current = ac
     try {
-      const res = await postChat({ phoneNumber: phone.trim(), userText: userMessage.text, signal: ac.signal })
+      const res = await postChat({ phoneNumber: phone.trim(), userText: userMessage.text, callSid: callSid.trim() || undefined, signal: ac.signal })
       if (!res.ok) {
         throw new Error(res.error ?? 'Failed to send')
       }
@@ -70,12 +71,21 @@ export default function ChatPage() {
       <h1>Chat</h1>
       <div className="controls">
         <label>
-          Phone
+          Phone (必須)
           <input
             type="tel"
             placeholder="09012345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+          />
+        </label>
+        <label>
+          Call SID (必須)
+          <input
+            type="text"
+            placeholder="CALL-SID-XXXX"
+            value={callSid}
+            onChange={(e) => setCallSid(e.target.value)}
           />
         </label>
       </div>

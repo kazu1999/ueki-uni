@@ -4,8 +4,9 @@ import { getApiBase } from '../shared/config'
 
 type PhonesResponse = { ok: boolean; phones?: string[]; items?: string[]; error?: string }
 type CallsResponse = { ok: boolean; items?: CallItem[]; calls?: CallItem[]; next_token?: string; error?: string }
-type CallItem = { ts: string; phone_number?: string; user_text?: string; assistant_text?: string }
+type CallItem = { ts: string; phone_number?: string; user_text?: string; assistant_text?: string; call_sid?: string }
 type PhoneWithLatest = { phone: string; latestTs: string | null }
+type GroupedItem = { key: string; phone: string; callSid: string | null; latestTs: string; count: number; sampleUser?: string; sampleAssistant?: string }
 
 async function fetchJson<T>(baseUrl: string, path: string): Promise<T> {
   if (!baseUrl) throw new Error('API Base URL is empty')
@@ -28,6 +29,8 @@ export default function CallLogsPage() {
 
   const [calls, setCalls] = useState<CallItem[]>([])
   const [nextToken, setNextToken] = useState<string | null>(null)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [phoneFilter, setPhoneFilter] = useState<string>('')
 
   const limitClamped = useMemo(() => Math.max(1, Math.min(200, Number(limit) || 50)), [limit])
 
@@ -68,7 +71,7 @@ export default function CallLogsPage() {
       const results = await Promise.allSettled(
         list.map(async (p) => {
           try {
-            const q = new URLSearchParams({ phone: p, limit: '1' })
+            const q = new URLSearchParams({ phone: p, limit: '1', order: 'desc' })
             const resp = await fetchJson<CallsResponse>(apiBase, `/calls?${q.toString()}`)
             const items = resp.items || resp.calls || []
             const latest = items[0]?.ts || null
@@ -160,6 +163,67 @@ export default function CallLogsPage() {
       return
     }
   }
+
+  const grouped = useMemo<GroupedItem[]>(() => {
+    const map = new Map<string, GroupedItem>()
+    for (const it of calls) {
+      const phone = it.phone_number || selectedPhone || ''
+      const callSid = it.call_sid || null
+      // group key: phone + callSid (if none, fallback to unique ts)
+      const key = callSid ? `${phone}|${callSid}` : `${phone}|${it.ts}`
+      const existing = map.get(key)
+      if (!existing) {
+        map.set(key, {
+          key,
+          phone,
+          callSid,
+          latestTs: it.ts,
+          count: 1,
+          sampleUser: it.user_text || undefined,
+          sampleAssistant: it.assistant_text || undefined,
+        })
+      } else {
+        existing.count += 1
+        if (Date.parse(it.ts) > Date.parse(existing.latestTs)) {
+          existing.latestTs = it.ts
+          existing.sampleUser = it.user_text || existing.sampleUser
+          existing.sampleAssistant = it.assistant_text || existing.sampleAssistant
+        }
+      }
+    }
+    const arr = Array.from(map.values())
+    arr.sort((a, b) => Date.parse(b.latestTs) - Date.parse(a.latestTs))
+    return arr
+  }, [calls, selectedPhone])
+
+  const groupedItems = useMemo(() => {
+    const m = new Map<string, CallItem[]>()
+    for (const it of calls) {
+      const phone = it.phone_number || selectedPhone || ''
+      const callSid = it.call_sid || null
+      const key = callSid ? `${phone}|${callSid}` : `${phone}|${it.ts}`
+      const arr = m.get(key) || []
+      arr.push(it)
+      m.set(key, arr)
+    }
+    // sort each group by ts ascending
+    for (const [k, arr] of m.entries()) {
+      arr.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts))
+      m.set(k, arr)
+    }
+    return m
+  }, [calls, selectedPhone])
+
+  const displayPhones = useMemo(() => {
+    const arr = [...phonesWithLatest]
+    arr.sort((a, b) => {
+      const ta = a.latestTs ? Date.parse(a.latestTs) : -Infinity
+      const tb = b.latestTs ? Date.parse(b.latestTs) : -Infinity
+      return tb - ta
+    })
+    const q = phoneFilter.trim()
+    return q ? arr.filter(({ phone }) => phone.includes(q)) : arr
+  }, [phonesWithLatest, phoneFilter])
   return (
     <div className="container">
       <header className="header">
@@ -174,17 +238,26 @@ export default function CallLogsPage() {
 
       <div className="grid">
         <section className="card">
-          <div className="phones vertical">
-            {phonesWithLatest.map(({ phone, latestTs }) => (
-              <button
-                key={phone}
-                className={phone === selectedPhone ? 'phone active' : 'phone'}
-                onClick={() => setSelectedPhone(phone)}
-              >
-                <div className="mono">{phone}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{latestTs || '-'}</div>
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Filter phone (partial)"
+              value={phoneFilter}
+              onChange={(e) => setPhoneFilter(e.target.value)}
+              style={{ padding: 8 }}
+            />
+            <div className="phones vertical">
+              {displayPhones.map(({ phone, latestTs }) => (
+                <button
+                  key={phone}
+                  className={phone === selectedPhone ? 'phone active' : 'phone'}
+                  onClick={() => setSelectedPhone(phone)}
+                >
+                  <div className="mono">{phone}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{latestTs || '-'}</div>
+                </button>
+              ))}
+            </div>
           </div>
         </section>
         <section className="card">
@@ -224,20 +297,49 @@ export default function CallLogsPage() {
           </div>
 
           <div className="logs">
-            {calls.map((item) => (
-              <div className="log-card" key={`${item.ts}-${item.phone_number || ''}`}>
+            {grouped.map((g) => (
+              <div className="log-card" key={g.key}>
                 <div className="row">
-                  <div className="muted">ts</div>
-                  <div className="mono">{item.ts}</div>
+                  <div className="muted">latest ts</div>
+                  <div className="mono">{g.latestTs}</div>
                 </div>
                 <div className="row">
-                  <div className="muted">user</div>
-                  <div>{item.user_text || ''}</div>
+                  <div className="muted">phone</div>
+                  <div className="mono">{g.phone}</div>
                 </div>
                 <div className="row">
-                  <div className="muted">assistant</div>
-                  <div>{item.assistant_text || ''}</div>
+                  <div className="muted">call_sid</div>
+                  <div className="mono">{g.callSid || '-'}</div>
                 </div>
+                <div className="row">
+                  <div className="muted">turns</div>
+                  <div className="mono">{g.count}</div>
+                </div>
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <button onClick={() => setExpandedKey(expandedKey === g.key ? null : g.key)}>
+                    {expandedKey === g.key ? 'Hide turns' : 'Show turns'}
+                  </button>
+                </div>
+                {expandedKey === g.key ? (
+                  <div style={{ marginTop: 8 }}>
+                    {(groupedItems.get(g.key) || []).map((item) => (
+                      <div key={`${item.ts}-${item.phone_number || ''}`} style={{ borderTop: '1px solid #eee', paddingTop: 8, marginTop: 8 }}>
+                        <div className="row">
+                          <div className="muted">ts</div>
+                          <div className="mono">{item.ts}</div>
+                        </div>
+                        <div className="row">
+                          <div className="muted">user</div>
+                          <div>{item.user_text || ''}</div>
+                        </div>
+                        <div className="row">
+                          <div className="muted">assistant</div>
+                          <div>{item.assistant_text || ''}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
