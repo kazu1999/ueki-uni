@@ -7,6 +7,8 @@ type CallsResponse = { ok: boolean; items?: CallItem[]; calls?: CallItem[]; next
 type CallItem = { ts: string; phone_number?: string; user_text?: string; assistant_text?: string; call_sid?: string }
 type PhoneWithLatest = { phone: string; latestTs: string | null }
 type GroupedItem = { key: string; phone: string; callSid: string | null; latestTs: string; count: number; sampleUser?: string; sampleAssistant?: string }
+type ChatLogEvent = { timestamp?: number; ingestionTime?: number; message?: string; logStreamName?: string; eventId?: string }
+type ChatLogsResponse = { ok: boolean; items?: ChatLogEvent[]; error?: string }
 
 async function fetchJson<T>(baseUrl: string, path: string): Promise<T> {
   if (!baseUrl) throw new Error('API Base URL is empty')
@@ -31,6 +33,10 @@ export default function CallLogsPage() {
   const [nextToken, setNextToken] = useState<string | null>(null)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [phoneFilter, setPhoneFilter] = useState<string>('')
+  const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
+  const [logsByKey, setLogsByKey] = useState<Record<string, ChatLogEvent[]>>({})
+  const [logsLoadingKey, setLogsLoadingKey] = useState<string | null>(null)
+  const [logsError, setLogsError] = useState<string>('')
 
   const limitClamped = useMemo(() => Math.max(1, Math.min(200, Number(limit) || 50)), [limit])
 
@@ -214,6 +220,44 @@ export default function CallLogsPage() {
     return m
   }, [calls, selectedPhone])
 
+  async function toggleLogsForKey(key: string) {
+    if (expandedLogs.has(key)) {
+      setExpandedLogs(prev => {
+        const ns = new Set(prev)
+        ns.delete(key)
+        return ns
+      })
+      return
+    }
+    setExpandedLogs(prev => new Set(prev).add(key))
+    if (logsByKey[key]) return
+    try {
+      setLogsError('')
+      setLogsLoadingKey(key)
+      const items = groupedItems.get(key) || []
+      const firstTs = items[0]?.ts
+      const lastTs = items[items.length - 1]?.ts
+      const firstMs = firstTs ? Date.parse(firstTs) : NaN
+      const lastMs = lastTs ? Date.parse(lastTs) : NaN
+      const padMin = 2
+      let startMs = Date.now() - 5 * 60 * 1000
+      let minutes = 10
+      if (!isNaN(firstMs) && !isNaN(lastMs)) {
+        startMs = Math.max(0, firstMs - padMin * 60 * 1000)
+        const spanMin = Math.max(1, Math.ceil((lastMs - firstMs) / 60000))
+        minutes = Math.min(60, spanMin + padMin * 2)
+      }
+      const q = new URLSearchParams({ startTimeMs: String(startMs), minutes: String(minutes), limit: '200' })
+      const data = await fetchJson<ChatLogsResponse>(apiBase, `/chat-logs?${q.toString()}`)
+      if (!data.ok) throw new Error(data.error || 'Failed to load logs')
+      setLogsByKey(prev => ({ ...prev, [key]: data.items || [] }))
+    } catch (e: unknown) {
+      setLogsError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLogsLoadingKey(null)
+    }
+  }
+
   const displayPhones = useMemo(() => {
     const arr = [...phonesWithLatest]
     arr.sort((a, b) => {
@@ -319,6 +363,9 @@ export default function CallLogsPage() {
                   <button onClick={() => setExpandedKey(expandedKey === g.key ? null : g.key)}>
                     {expandedKey === g.key ? 'Hide turns' : 'Show turns'}
                   </button>
+                  <button onClick={() => toggleLogsForKey(g.key)} disabled={logsLoadingKey === g.key}>
+                    {expandedLogs.has(g.key) ? 'Hide logs' : (logsLoadingKey === g.key ? 'Loading…' : 'Show logs')}
+                  </button>
                 </div>
                 {expandedKey === g.key ? (
                   <div style={{ marginTop: 8 }}>
@@ -338,6 +385,17 @@ export default function CallLogsPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                ) : null}
+                {expandedLogs.has(g.key) ? (
+                  <div style={{ marginTop: 8 }}>
+                    {logsError && <div style={{ color: '#b91c1c', marginBottom: 8 }}>Logs Error: {logsError}</div>}
+                    <pre style={{ background: '#f8fafc', padding: 12, whiteSpace: 'pre-wrap', textAlign: 'left', maxHeight: 300, overflow: 'auto' }}>
+                      {(logsByKey[g.key] || []).map((ev) => {
+                        const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : ''
+                        return `${ts} ${ev.message || ''}`
+                      }).join('\n') || '(no logs)'}
+                    </pre>
                   </div>
                 ) : null}
               </div>

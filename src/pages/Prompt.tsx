@@ -64,7 +64,7 @@ export default function PromptPage() {
       </div>
       <details style={{ marginTop: 16 }}>
         <summary>プレビュー（Markdown）</summary>
-        <div style={{ background: '#f8fafc', padding: 12, overflow: 'auto' }}>
+        <div style={{ background: '#f8fafc', padding: 12, overflow: 'auto', textAlign: 'left' }}>
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       </details>

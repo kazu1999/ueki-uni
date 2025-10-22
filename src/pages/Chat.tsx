@@ -16,6 +16,7 @@ export default function ChatPage() {
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const canSend = useMemo(() => {
     return phone.trim().length > 0 && callSid.trim().length > 0 && input.trim().length > 0 && !isSending
@@ -31,6 +32,10 @@ export default function ChatPage() {
     }
     setMessages((prev) => [...prev, userMessage])
     setInput('')
+    // 念のためDOM上の値もクリア
+    if (textareaRef.current) {
+      textareaRef.current.value = ''
+    }
     setIsSending(true)
     const ac = new AbortController()
     abortRef.current = ac
@@ -53,13 +58,14 @@ export default function ChatPage() {
       setIsSending(false)
       abortRef.current = null
     }
-  }, [canSend, phone, input])
+  }, [canSend, phone, input, callSid])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       e.preventDefault()
       onSend()
     }
+    // Enter 単体や Shift+Enter はデフォルトの改行を許可
   }, [onSend])
 
   const onCancel = useCallback(() => {
@@ -107,6 +113,7 @@ export default function ChatPage() {
 
       <div className="composer">
         <textarea
+          ref={textareaRef}
           placeholder="メッセージを入力..."
           value={input}
           onChange={(e) => setInput(e.target.value)}

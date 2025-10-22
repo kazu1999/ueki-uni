@@ -4,6 +4,8 @@ import ChatPage from './pages/Chat'
 import CallLogsPage from './pages/CallLogs'
 import FaqPage from './pages/Faq'
 import PromptPage from './pages/Prompt'
+import FuncConfigPage from './pages/FuncConfig'
+import TasksPage from './pages/Tasks'
 
 function Layout() {
   return (
@@ -17,6 +19,8 @@ function Layout() {
           <NavLink to="/call-logs">Call Logs</NavLink>
           <NavLink to="/faq">FAQ</NavLink>
           <NavLink to="/prompt">Prompt</NavLink>
+          <NavLink to="/func-config">Func Config</NavLink>
+          <NavLink to="/tasks">DataBase</NavLink>
         </nav>
       </aside>
       <main style={{ padding: 16 }}>
@@ -30,11 +34,23 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<div>Welcome. Choose a section from the left.</div>} />
+        <Route
+          index
+          element={
+            <div>
+              <div style={{ marginBottom: 8 }}>This system is linked to this number</div>
+              <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 20 }}>
+                +1 231 797 2645
+              </div>
+            </div>
+          }
+        />
         <Route path="chat" element={<ChatPage />} />
         <Route path="call-logs" element={<CallLogsPage />} />
         <Route path="faq" element={<FaqPage />} />
         <Route path="prompt" element={<PromptPage />} />
+        <Route path="func-config" element={<FuncConfigPage />} />
+        <Route path="tasks" element={<TasksPage />} />
         <Route path="*" element={<div>Not Found</div>} />
       </Route>
     </Routes>
