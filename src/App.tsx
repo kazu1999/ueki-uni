@@ -6,6 +6,7 @@ import FaqPage from './pages/Faq'
 import PromptPage from './pages/Prompt'
 import FuncConfigPage from './pages/FuncConfig'
 import TasksPage from './pages/Tasks'
+import ExtToolsPage from './pages/ExtTools'
 
 function Layout() {
   return (
@@ -21,6 +22,7 @@ function Layout() {
           <NavLink to="/prompt">Prompt</NavLink>
           <NavLink to="/func-config">Func Config</NavLink>
           <NavLink to="/tasks">DataBase</NavLink>
+          <NavLink to="/ext-tools">External APIs</NavLink>
         </nav>
       </aside>
       <main style={{ padding: 16 }}>
@@ -51,6 +53,7 @@ export default function App() {
         <Route path="prompt" element={<PromptPage />} />
         <Route path="func-config" element={<FuncConfigPage />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="ext-tools" element={<ExtToolsPage />} />
         <Route path="*" element={<div>Not Found</div>} />
       </Route>
     </Routes>

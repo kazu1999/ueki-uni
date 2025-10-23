@@ -7,6 +7,8 @@ export default function TasksPage() {
   const [error, setError] = useState<string>('')
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<{ name: string; phone_number?: string; address?: string; start_datetime?: string; request?: string }>({ name: '' })
+  const [editing, setEditing] = useState<Task | null>(null)
+  const [editForm, setEditForm] = useState<{ phone_number?: string; address?: string; start_datetime?: string; request?: string }>({})
 
   async function refresh() {
     setLoading(true)
@@ -95,26 +97,12 @@ export default function TasksPage() {
               <td style={{ borderBottom: '1px solid #eee', padding: 8 }}>{it.request || it.requirement || ''}</td>
               <td style={{ borderBottom: '1px solid #eee', padding: 8 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={async () => {
-                    const req = prompt('request', it.request || it.requirement || '')
-                    if (req === null) return
-                    const sd = prompt('start_datetime (YYYY-MM-DD HH:MM)', it.start_datetime || it.start_date || '')
-                    if (sd === null) return
-                    const ph = prompt('phone_number', it.phone_number || '')
-                    if (ph === null) return
-                    const adr = prompt('address', it.address || '')
-                    if (sd === null) return
-                    setLoading(true)
-                    setError('')
-                    try {
-                      await updateTask(it.name, { request: req, start_datetime: sd, phone_number: ph || undefined, address: adr || undefined })
-                      await refresh()
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : String(e))
-                    } finally {
-                      setLoading(false)
-                    }
-                  }}>Edit</button>
+                  <button onClick={() => { setEditing(it); setEditForm({
+                    phone_number: it.phone_number || '',
+                    address: it.address || '',
+                    start_datetime: it.start_datetime || it.start_date || '',
+                    request: it.request || it.requirement || '',
+                  }) }}>Edit</button>
                   <button onClick={async () => {
                     if (!confirm(`Delete ${it.name}?`)) return
                     setLoading(true)
@@ -134,6 +122,65 @@ export default function TasksPage() {
           ))}
         </tbody>
       </table>
+
+      {editing ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+          }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setEditing(null) }}
+        >
+          <div style={{ background: '#fff', borderRadius: 8, minWidth: 520, maxWidth: '90vw', padding: 16, boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h2 style={{ margin: 0 }}>Edit: {editing.name}</h2>
+              <button onClick={() => setEditing(null)}>×</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <label>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>phone_number</div>
+                <input value={editForm.phone_number || ''} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} />
+              </label>
+              <label>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>address</div>
+                <input value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>start_datetime (YYYY-MM-DD HH:MM)</div>
+                <input value={editForm.start_datetime || ''} onChange={(e) => setEditForm({ ...editForm, start_datetime: e.target.value })} />
+              </label>
+              <label style={{ gridColumn: '1 / -1' }}>
+                <div style={{ fontSize: 12, color: '#6b7280' }}>request</div>
+                <textarea rows={4} value={editForm.request || ''} onChange={(e) => setEditForm({ ...editForm, request: e.target.value })} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button onClick={() => setEditing(null)} disabled={loading}>Cancel</button>
+              <button onClick={async () => {
+                if (!editing) return
+                setLoading(true)
+                setError('')
+                try {
+                  await updateTask(editing.name, {
+                    phone_number: editForm.phone_number,
+                    address: editForm.address,
+                    start_datetime: editForm.start_datetime,
+                    request: editForm.request,
+                  })
+                  setEditing(null)
+                  await refresh()
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : String(e))
+                } finally {
+                  setLoading(false)
+                }
+              }} disabled={loading}>Save</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
