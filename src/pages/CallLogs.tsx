@@ -33,6 +33,7 @@ export default function CallLogsPage() {
   const [nextToken, setNextToken] = useState<string | null>(null)
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [phoneFilter, setPhoneFilter] = useState<string>('')
+  const [debouncedPhoneFilter, setDebouncedPhoneFilter] = useState<string>('')
   const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set())
   const [logsByKey, setLogsByKey] = useState<Record<string, ChatLogEvent[]>>({})
   const [logsLoadingKey, setLogsLoadingKey] = useState<string | null>(null)
@@ -142,6 +143,33 @@ export default function CallLogsPage() {
     return `${y}-${m}-${day}T${hh}:${mm}`
   }
 
+  function fmtJstFromIso(iso: string | undefined | null): string {
+    if (!iso) return '-'
+    const d = new Date(iso)
+    if (isNaN(d.getTime())) return iso
+    // Format as YYYY-MM-DD HH:mm:ss in Asia/Tokyo
+    const y = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(d)
+    const mo = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: '2-digit' }).format(d)
+    const da = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', day: '2-digit' }).format(d)
+    const hh = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', hour12: false }).format(d)
+    const mm = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', minute: '2-digit' }).format(d)
+    const ss = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', second: '2-digit' }).format(d)
+    return `${y}-${mo}-${da} ${hh}:${mm}:${ss}`
+  }
+
+  function fmtJstFromMs(ms: number | undefined): string {
+    if (!ms && ms !== 0) return ''
+    const d = new Date(ms)
+    if (isNaN(d.getTime())) return ''
+    const y = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric' }).format(d)
+    const mo = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', month: '2-digit' }).format(d)
+    const da = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', day: '2-digit' }).format(d)
+    const hh = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', hour12: false }).format(d)
+    const mm = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', minute: '2-digit' }).format(d)
+    const ss = new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', second: '2-digit' }).format(d)
+    return `${y}-${mo}-${da} ${hh}:${mm}:${ss}`
+  }
+
   function setQuickRange(range: 'today' | '24h' | '7d' | 'clear') {
     const now = new Date()
     if (range === 'clear') {
@@ -220,6 +248,49 @@ export default function CallLogsPage() {
     return m
   }, [calls, selectedPhone])
 
+  async function onDeleteCall(phone: string, ts: string) {
+    if (!apiBase) {
+      setError('API Base URL is not configured')
+      return
+    }
+    if (!confirm(`Delete call log?\nphone=${phone}\nts=${ts}`)) return
+    setLoading(true)
+    setError('')
+    try {
+      const q = new URLSearchParams({ phone, ts })
+      const res = await fetch(`${apiBase}/call?${q.toString()}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string }
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
+      setCalls(prev => prev.filter(it => !(it.phone_number === phone && it.ts === ts)))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function onDeleteSession(callSid: string | null) {
+    if (!apiBase || !callSid) return
+    if (!confirm(`Delete entire session?\ncall_sid=${callSid}`)) return
+    setLoading(true)
+    setError('')
+    try {
+      const q = new URLSearchParams({ call_sid: callSid })
+      const res = await fetch(`${apiBase}/call?${q.toString()}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; deleted?: number }
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `HTTP ${res.status}`)
+      }
+      setCalls(prev => prev.filter(it => it.call_sid !== callSid))
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
   async function toggleLogsForKey(key: string) {
     if (expandedLogs.has(key)) {
       setExpandedLogs(prev => {
@@ -258,6 +329,11 @@ export default function CallLogsPage() {
     }
   }
 
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedPhoneFilter(phoneFilter), 300)
+    return () => clearTimeout(id)
+  }, [phoneFilter])
+
   const displayPhones = useMemo(() => {
     const arr = [...phonesWithLatest]
     arr.sort((a, b) => {
@@ -265,9 +341,9 @@ export default function CallLogsPage() {
       const tb = b.latestTs ? Date.parse(b.latestTs) : -Infinity
       return tb - ta
     })
-    const q = phoneFilter.trim()
+    const q = debouncedPhoneFilter.trim()
     return q ? arr.filter(({ phone }) => phone.includes(q)) : arr
-  }, [phonesWithLatest, phoneFilter])
+  }, [phonesWithLatest, debouncedPhoneFilter])
   return (
     <div className="container">
       <header className="header">
@@ -298,7 +374,7 @@ export default function CallLogsPage() {
                   onClick={() => setSelectedPhone(phone)}
                 >
                   <div className="mono">{phone}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>{latestTs || '-'}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>{fmtJstFromIso(latestTs)}</div>
                 </button>
               ))}
             </div>
@@ -345,7 +421,7 @@ export default function CallLogsPage() {
               <div className="log-card" key={g.key}>
                 <div className="row">
                   <div className="muted">latest ts</div>
-                  <div className="mono">{g.latestTs}</div>
+                  <div className="mono">{fmtJstFromIso(g.latestTs)}</div>
                 </div>
                 <div className="row">
                   <div className="muted">phone</div>
@@ -363,6 +439,11 @@ export default function CallLogsPage() {
                   <button onClick={() => setExpandedKey(expandedKey === g.key ? null : g.key)}>
                     {expandedKey === g.key ? 'Hide turns' : 'Show turns'}
                   </button>
+                  {g.callSid ? (
+                    <button onClick={() => onDeleteSession(g.callSid)} disabled={loading}>
+                      Delete session
+                    </button>
+                  ) : null}
                   <button onClick={() => toggleLogsForKey(g.key)} disabled={logsLoadingKey === g.key}>
                     {expandedLogs.has(g.key) ? 'Hide logs' : (logsLoadingKey === g.key ? 'Loading…' : 'Show logs')}
                   </button>
@@ -372,16 +453,20 @@ export default function CallLogsPage() {
                     {(groupedItems.get(g.key) || []).map((item) => (
                       <div key={`${item.ts}-${item.phone_number || ''}`} style={{ borderTop: '1px solid #eee', paddingTop: 8, marginTop: 8 }}>
                         <div className="row">
-                          <div className="muted">ts</div>
-                          <div className="mono">{item.ts}</div>
-                        </div>
-                        <div className="row">
                           <div className="muted">user</div>
                           <div>{item.user_text || ''}</div>
                         </div>
                         <div className="row">
                           <div className="muted">assistant</div>
                           <div>{item.assistant_text || ''}</div>
+                        </div>
+                        <div style={{ marginTop: 6 }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onDeleteCall(item.phone_number || g.phone, item.ts) }}
+                            disabled={loading}
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -392,8 +477,7 @@ export default function CallLogsPage() {
                     {logsError && <div style={{ color: '#b91c1c', marginBottom: 8 }}>Logs Error: {logsError}</div>}
                     <pre style={{ background: '#f8fafc', padding: 12, whiteSpace: 'pre-wrap', textAlign: 'left', maxHeight: 300, overflow: 'auto' }}>
                       {(logsByKey[g.key] || []).map((ev) => {
-                        const ts = ev.timestamp ? new Date(ev.timestamp).toISOString() : ''
-                        return `${ts} ${ev.message || ''}`
+                        return `${fmtJstFromMs(ev.timestamp)} ${ev.message || ''}`
                       }).join('\n') || '(no logs)'}
                     </pre>
                   </div>

@@ -6,6 +6,7 @@ export default function FuncConfigPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
+  const [msg, setMsg] = useState<string>('')
 
   useEffect(() => {
     setLoading(true)
@@ -21,14 +22,28 @@ export default function FuncConfigPage() {
   async function onSave() {
     setSaving(true)
     setError('')
+    setMsg('')
     try {
       const cfg = JSON.parse(text)
       const res = await putFuncConfig(cfg)
       if (!res.ok) throw new Error('save failed')
+      setMsg('保存しました')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  function onFormat() {
+    setError('')
+    setMsg('')
+    try {
+      const obj = JSON.parse(text || '{}')
+      setText(JSON.stringify(obj, null, 2))
+      setMsg('整形しました')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -51,6 +66,7 @@ export default function FuncConfigPage() {
       <h1>Function Calling Config</h1>
       {loading ? <div>Loading...</div> : null}
       {error ? <div style={{ color: 'red', marginBottom: 8 }}>{error}</div> : null}
+      {msg ? <div style={{ color: '#059669', marginBottom: 8 }}>{msg}</div> : null}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -59,6 +75,7 @@ export default function FuncConfigPage() {
         placeholder='{"tools": [...], "instructions": "..."}'
       />
       <div style={{ marginTop: 8 }}>
+        <button onClick={onFormat} style={{ marginRight: 8 }}>整形</button>
         <button onClick={onSave} disabled={saving}>保存</button>
       </div>
       <details style={{ marginTop: 12 }}>

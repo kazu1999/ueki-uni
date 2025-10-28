@@ -72,6 +72,13 @@ export default function ChatPage() {
     abortRef.current?.abort()
   }, [])
 
+  function autosize() {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
   return (
     <div className="container">
       <h1>Chat</h1>
@@ -116,13 +123,14 @@ export default function ChatPage() {
           ref={textareaRef}
           placeholder="メッセージを入力..."
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => { setInput(e.target.value); autosize() }}
           onKeyDown={onKeyDown}
           rows={3}
         />
         <div className="actions">
           <button onClick={onSend} disabled={!canSend}>送信</button>
           {isSending && <button onClick={onCancel}>中止</button>}
+          <div style={{ color: '#6b7280', fontSize: 12, marginLeft: 8 }}>Cmd/Ctrl+Enter で送信</div>
         </div>
       </div>
     </div>

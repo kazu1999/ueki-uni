@@ -38,6 +38,7 @@ npm run dev -- --host
 - `/` ホーム（接続番号案内: +1 231 797 2645）
 - `/chat` チャット
 - `/call-logs` 通話ログ可視化（セッション毎の「Show logs」でLambdaログ表示）
+  - 機能: フィルタ、ページング、JST表示、各ターン削除、セッション一括削除（call_sid）
 - `/faq` FAQ 管理
 - `/prompt` システムプロンプト編集（Markdownプレビュー）
 - `/func-config` Function Calling 設定（JSON整形プレビュー）
@@ -72,6 +73,15 @@ npm run dev -- --host
 - 送信: Cmd+Enter（macOS）または Ctrl+Enter（Windows/Linux）
 
 送信後は入力欄を自動クリアします。
+
+## 表示とデータの正規化
+
+- 時刻表示: 画面上の時刻（セッション最新時刻・各ターン・ログプレビュー）は日本標準時（Asia/Tokyo, `YYYY-MM-DD HH:mm:ss`）で表示します。
+- 電話番号の正規化（バックエンド）:
+  - `+81xxxxxxxxxx` は `0xxxxxxxxxx` に変換して保存
+  - それ以外の `+` は除去。数字以外は除去
+  - 同一の実番号で形式差（+有無）があっても同じキーで集約
+- チャット履歴の参照: `call_sid` がある場合は同一電話番号かつ同一 `call_sid` のログのみ履歴として参照します。
 
 ## プロンプト（Markdown）運用
 

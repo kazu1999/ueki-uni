@@ -6,6 +6,7 @@ export default function ExtToolsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
+  const [msg, setMsg] = useState<string>('')
 
   useEffect(() => {
     setLoading(true)
@@ -35,6 +36,7 @@ export default function ExtToolsPage() {
   async function onSave() {
     setSaving(true)
     setError('')
+    setMsg('')
     try {
       const cfg = JSON.parse(text || '{}') as ExtToolsConfig
       if (!cfg || typeof cfg !== 'object' || !('ext_tools' in cfg)) {
@@ -42,10 +44,23 @@ export default function ExtToolsPage() {
       }
       const res = await putExtTools(cfg)
       if (!res.ok) throw new Error(res.error || 'save failed')
+      setMsg('保存しました')
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setSaving(false)
+    }
+  }
+
+  function onFormat() {
+    setError('')
+    setMsg('')
+    try {
+      const obj = JSON.parse(text || '{}')
+      setText(JSON.stringify(obj, null, 2))
+      setMsg('整形しました')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -83,6 +98,7 @@ export default function ExtToolsPage() {
       <h1>External APIs (ext-tools)</h1>
       {loading ? <div>Loading...</div> : null}
       {error ? <div style={{ color: 'red', marginBottom: 8 }}>{error}</div> : null}
+      {msg ? <div style={{ color: '#059669', marginBottom: 8 }}>{msg}</div> : null}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -91,6 +107,7 @@ export default function ExtToolsPage() {
         placeholder='{"ext_tools": [...]}'>
       </textarea>
       <div style={{ marginTop: 8 }}>
+        <button onClick={onFormat} style={{ marginRight: 8 }}>整形</button>
         <button onClick={onSave} disabled={saving}>保存</button>
       </div>
       <details style={{ marginTop: 12 }}>
