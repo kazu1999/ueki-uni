@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import '../styles/calllogs.css'
 import { getApiBase } from '../shared/config'
+import { listRecordings, recordingUrl, type RecordingItem } from '../shared/api/recordings'
 
 type PhonesResponse = { ok: boolean; phones?: string[]; items?: string[]; error?: string }
 type CallsResponse = { ok: boolean; items?: CallItem[]; calls?: CallItem[]; next_token?: string; error?: string }
@@ -38,6 +39,12 @@ export default function CallLogsPage() {
   const [logsByKey, setLogsByKey] = useState<Record<string, ChatLogEvent[]>>({})
   const [logsLoadingKey, setLogsLoadingKey] = useState<string | null>(null)
   const [logsError, setLogsError] = useState<string>('')
+
+  // Recordings (per call_sid)
+  const [recExpanded, setRecExpanded] = useState<Set<string>>(new Set())
+  const [recBySid, setRecBySid] = useState<Record<string, RecordingItem[]>>({})
+  const [recLoadingSid, setRecLoadingSid] = useState<string | null>(null)
+  const [recError, setRecError] = useState<string>('')
 
   const limitClamped = useMemo(() => Math.max(1, Math.min(200, Number(limit) || 50)), [limit])
 
@@ -329,6 +336,31 @@ export default function CallLogsPage() {
     }
   }
 
+  async function toggleRecordings(callSid: string | null) {
+    if (!callSid) return
+    if (recExpanded.has(callSid)) {
+      setRecExpanded(prev => {
+        const ns = new Set(prev)
+        ns.delete(callSid)
+        return ns
+      })
+      return
+    }
+    setRecExpanded(prev => new Set(prev).add(callSid))
+    if (recBySid[callSid]) return
+    try {
+      setRecError('')
+      setRecLoadingSid(callSid)
+      const res = await listRecordings(callSid)
+      if (!res.ok) throw new Error(res.error || 'failed to load recordings')
+      setRecBySid(prev => ({ ...prev, [callSid]: res.items || [] }))
+    } catch (e: unknown) {
+      setRecError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setRecLoadingSid(null)
+    }
+  }
+
   useEffect(() => {
     const id = setTimeout(() => setDebouncedPhoneFilter(phoneFilter), 300)
     return () => clearTimeout(id)
@@ -447,6 +479,11 @@ export default function CallLogsPage() {
                   <button onClick={() => toggleLogsForKey(g.key)} disabled={logsLoadingKey === g.key}>
                     {expandedLogs.has(g.key) ? 'Hide logs' : (logsLoadingKey === g.key ? 'Loading…' : 'Show logs')}
                   </button>
+                  {g.callSid ? (
+                    <button onClick={() => toggleRecordings(g.callSid)} disabled={recLoadingSid === g.callSid}>
+                      {recExpanded.has(g.callSid) ? 'Hide recordings' : (recLoadingSid === g.callSid ? 'Loading…' : 'Show recordings')}
+                    </button>
+                  ) : null}
                 </div>
                 {expandedKey === g.key ? (
                   <div style={{ marginTop: 8 }}>
@@ -480,6 +517,28 @@ export default function CallLogsPage() {
                         return `${fmtJstFromMs(ev.timestamp)} ${ev.message || ''}`
                       }).join('\n') || '(no logs)'}
                     </pre>
+                  </div>
+                ) : null}
+                {g.callSid && recExpanded.has(g.callSid) ? (
+                  <div style={{ marginTop: 8 }}>
+                    {recError && <div style={{ color: '#b91c1c', marginBottom: 8 }}>Recordings Error: {recError}</div>}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {(recBySid[g.callSid] || []).length === 0 ? (
+                        <div className="muted">(no recordings)</div>
+                      ) : (
+                        (recBySid[g.callSid] || []).map((r) => (
+                          <div key={r.sid} className="row" style={{ alignItems: 'center' }}>
+                            <div className="muted">sid</div>
+                            <div className="mono">{r.sid}</div>
+                            <div className="muted">duration</div>
+                            <div className="mono">{r.duration ? `${r.duration}s` : '-'}</div>
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <audio controls src={recordingUrl(r.sid, (r.media_format as any) || 'mp3')} style={{ width: '100%' }} />
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>
