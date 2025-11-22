@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import '../styles/calllogs.css'
 import { getApiBase } from '../shared/config'
 import { listRecordings, recordingUrl, type RecordingItem } from '../shared/api/recordings'
+import { Pagination } from '../widgets/Pagination'
 
 type PhonesResponse = { ok: boolean; phones?: string[]; items?: string[]; error?: string }
 type CallsResponse = { ok: boolean; items?: CallItem[]; calls?: CallItem[]; next_token?: string; error?: string }
@@ -28,7 +29,7 @@ export default function CallLogsPage() {
 
   const [fromTs, setFromTs] = useState('')
   const [toTs, setToTs] = useState('')
-  const [limit, setLimit] = useState<number>(50)
+  const [limit, setLimit] = useState<number>(1000)
 
   const [calls, setCalls] = useState<CallItem[]>([])
   const [nextToken, setNextToken] = useState<string | null>(null)
@@ -46,7 +47,11 @@ export default function CallLogsPage() {
   const [recLoadingSid, setRecLoadingSid] = useState<string | null>(null)
   const [recError, setRecError] = useState<string>('')
 
-  const limitClamped = useMemo(() => Math.max(1, Math.min(200, Number(limit) || 50)), [limit])
+  // Client-side pagination for grouped sessions
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const pageSize = 10
+
+  const limitClamped = useMemo(() => Math.max(1, Math.min(1000, Number(limit) || 1000)), [limit])
 
   async function loadCalls(reset: boolean) {
     try {
@@ -376,6 +381,18 @@ export default function CallLogsPage() {
     const q = debouncedPhoneFilter.trim()
     return q ? arr.filter(({ phone }) => phone.includes(q)) : arr
   }, [phonesWithLatest, debouncedPhoneFilter])
+
+  // Reset pagination when filters or selection change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [selectedPhone, fromTs, toTs, debouncedPhoneFilter])
+
+  const totalPages = Math.max(1, Math.ceil((grouped.length || 0) / pageSize))
+  const pagedGroups = useMemo(() => {
+    const start = (currentPage - 1) * pageSize
+    return grouped.slice(start, start + pageSize)
+  }, [grouped, currentPage])
+
   return (
     <div className="container">
       <header className="header">
@@ -428,7 +445,7 @@ export default function CallLogsPage() {
                 type="number"
                 value={limit}
                 min={1}
-                max={200}
+                 max={1000}
                 onChange={e => setLimit(Number(e.target.value))}
                 style={{ width: 80 }}
               />
@@ -449,7 +466,7 @@ export default function CallLogsPage() {
           </div>
 
           <div className="logs">
-            {grouped.map((g) => (
+            {pagedGroups.map((g) => (
               <div className="log-card" key={g.key}>
                 <div className="row">
                   <div className="muted">latest ts</div>
@@ -543,6 +560,12 @@ export default function CallLogsPage() {
                 ) : null}
               </div>
             ))}
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="muted" style={{ fontSize: 12 }}>
+              Showing {(grouped.length === 0) ? 0 : ((currentPage - 1) * pageSize + 1)} - {Math.min(currentPage * pageSize, grouped.length)} of {grouped.length}
+            </div>
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
           </div>
         </section>
       </div>
