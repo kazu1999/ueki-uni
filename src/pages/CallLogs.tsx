@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import '../styles/calllogs.css'
 import { getApiBase } from '../shared/config'
 import { listRecordings, recordingUrl, type RecordingItem } from '../shared/api/recordings'
+import { getTranscription } from '../shared/api/transcription'
 import { Pagination } from '../widgets/Pagination'
 
 type PhonesResponse = { ok: boolean; phones?: string[]; items?: string[]; error?: string }
@@ -46,6 +47,7 @@ export default function CallLogsPage() {
   const [recBySid, setRecBySid] = useState<Record<string, RecordingItem[]>>({})
   const [recLoadingSid, setRecLoadingSid] = useState<string | null>(null)
   const [recError, setRecError] = useState<string>('')
+  const [recTranscriptBySid, setRecTranscriptBySid] = useState<Record<string, { loading: boolean; error?: string; text?: string }>>({})
 
   // Client-side pagination for grouped sessions
   const [currentPage, setCurrentPage] = useState<number>(1)
@@ -552,6 +554,35 @@ export default function CallLogsPage() {
                             <div style={{ gridColumn: '1 / -1' }}>
                               <audio controls src={recordingUrl(r.sid, (r.media_format as any) || 'mp3')} style={{ width: '100%' }} />
                             </div>
+                          <div style={{ gridColumn: '1 / -1', marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                              onClick={async () => {
+                                setRecTranscriptBySid(prev => ({ ...prev, [r.sid]: { ...(prev[r.sid] || {}), loading: true, error: undefined } }))
+                                try {
+                                  const res = await getTranscription(r.sid)
+                                  if (!res.ok) throw new Error(res.error || 'failed to transcribe')
+                                  setRecTranscriptBySid(prev => ({ ...prev, [r.sid]: { loading: false, text: res.text || '' } }))
+                                } catch (e: unknown) {
+                                  const msg = e instanceof Error ? e.message : String(e)
+                                  setRecTranscriptBySid(prev => ({ ...prev, [r.sid]: { loading: false, error: msg } }))
+                                }
+                              }}
+                              disabled={!!recTranscriptBySid[r.sid]?.loading}
+                            >
+                              {recTranscriptBySid[r.sid]?.loading ? 'Transcribing…' : 'Transcribe (Whisper)'}
+                            </button>
+                          </div>
+                          {recTranscriptBySid[r.sid]?.error ? (
+                            <div style={{ gridColumn: '1 / -1', color: '#b91c1c' }}>Error: {recTranscriptBySid[r.sid]?.error}</div>
+                          ) : null}
+                          {recTranscriptBySid[r.sid]?.text ? (
+                            <div style={{ gridColumn: '1 / -1', marginTop: 6 }}>
+                              <div className="muted" style={{ marginBottom: 4 }}>Transcript</div>
+                              <pre style={{ background: '#f8fafc', padding: 12, whiteSpace: 'pre-wrap', textAlign: 'left' }}>
+                                {recTranscriptBySid[r.sid]?.text}
+                              </pre>
+                            </div>
+                          ) : null}
                           </div>
                         ))
                       )}

@@ -38,7 +38,12 @@ npm run dev -- --host
 - `/` ホーム（接続番号案内: +1 231 797 2645）
 - `/chat` チャット
 - `/call-logs` 通話ログ可視化（セッション毎の「Show logs」でLambdaログ表示）
-  - 機能: フィルタ、ページング、JST表示、各ターン削除、セッション一括削除（call_sid）
+  - 機能: フィルタ、ページング（クライアント側）、JST表示、各ターン削除、セッション一括削除（call_sid）、録音再生（Twilio, 「Show recordings」）
+  - 備考: 取得の `limit` はターン（アイテム）件数の上限で、既定は 1000。セッション数ではありません
+  - 追加: 録音の文字起こし（OpenAI Whisper, 「Transcribe (Whisper)」）
+    - 事前にバックエンド（`ueki-calllogs`）で Secrets Manager の `UEKI_OPENAI_APIKEY` を設定
+    - `GET /transcription?recording_sid=RE...` を呼び出してテキストを表示
+    - 注意: 同期APIのため、処理時間は約30秒まで（Lambdaタイムアウト30秒）。長尺・高負荷時は失敗することがあります
 - `/faq` FAQ 管理
 - `/prompt` システムプロンプト編集（Markdownプレビュー）
 - `/func-config` Function Calling 設定（JSON整形プレビュー）
@@ -64,8 +69,17 @@ npm run dev -- --host
 - `GET /tasks` / `POST /task` / `GET|PUT|DELETE /task/{name}`
 - `GET /chat-logs`（CloudWatch Logs 取得）
 - `GET /ext-tools` / `PUT /ext-tools`（外部APIツール定義の取得・保存）
+- `GET /recordings`（Twilio録音一覧: `?call_sid=CA...`）
+- `GET /recording/{sid}`（Twilio録音ストリーム: `?format=mp3|wav`）
+- `GET /transcription`（録音の文字起こし: `?recording_sid=RE...`）
 
-詳細は `chat_api/aws.md` を参照してください。
+詳細は `chat_api/readme.md`（API詳細）および `chat_api/aws.md` を参照してください。
+
+## Call Logs 操作メモ
+
+- 電話番号を選択 → 「Load Calls」で最新から取得（必要に応じて「Load More」）
+- セッション行の「Show turns」で発話の詳細、「Show logs」で Lambda ログ、「Show recordings」で録音を `<audio>` 再生
+- 取得の並び順は最新優先（desc）。`limit` はターン件数の上限（既定 1000）。多数ある場合でも画面はページング表示
 
 ## チャット操作（ショートカット）
 
