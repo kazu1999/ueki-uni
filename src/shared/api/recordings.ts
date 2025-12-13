@@ -1,4 +1,5 @@
 import { getApiBase } from '../config'
+import { fetchJson } from '../auth-fetch'
 
 export type RecordingItem = {
   sid: string
@@ -8,10 +9,8 @@ export type RecordingItem = {
 }
 
 export async function listRecordings(callSid: string): Promise<{ ok: boolean; items: RecordingItem[]; error?: string }> {
-  const base = getApiBase()
   const q = new URLSearchParams({ call_sid: callSid })
-  const res = await fetch(`${base}/recordings?${q.toString()}`)
-  return res.json()
+  return fetchJson<{ ok: boolean; items: RecordingItem[]; error?: string }>(`/recordings?${q.toString()}`)
 }
 
 export function recordingUrl(recordingSid: string, format: 'mp3' | 'wav' = 'mp3'): string {

@@ -1,4 +1,4 @@
-import { getApiBase } from '../config'
+import { fetchJson } from '../auth-fetch'
 
 export type ChatResponse = {
   ok: boolean
@@ -12,10 +12,8 @@ export async function postChat(params: {
   callSid?: string
   signal?: AbortSignal
 }): Promise<ChatResponse> {
-  const base = getApiBase()
-  const res = await fetch(`${base}/chat`, {
+  return fetchJson<ChatResponse>('/chat', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       phone_number: params.phoneNumber,
       user_text: params.userText,
@@ -23,7 +21,6 @@ export async function postChat(params: {
     }),
     signal: params.signal,
   })
-  return (await res.json()) as ChatResponse
 }
 
 

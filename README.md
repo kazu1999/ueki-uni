@@ -1,6 +1,7 @@
 # UEKI Unified App (Chat / Call Logs / FAQ / Function Config / DataBase)
 
 React 19 + Vite 7 で 3 つのアプリ（チャット、通話ログ、FAQ）を単一 SPA に統合したプロジェクトです。
+マルチテナントに対応し、AWS Cognito による認証ログインが必要です。
 
 ## セットアップ
 
@@ -20,18 +21,30 @@ npm install
 3) 環境変数を設定（AWS API を使用）
 
 `unified_app/.env.local` に以下を設定します。
+これらの値は `chat_api/terraform` の `terraform apply` 結果（output）から取得できます。
 
+```bash
+VITE_API_BASE_URL=https://{api_id}.execute-api.{region}.amazonaws.com
+VITE_COGNITO_REGION=ap-northeast-1
+VITE_COGNITO_USER_POOL_ID=ap-northeast-1_xxxxxx
+VITE_COGNITO_USER_POOL_CLIENT_ID=xxxxxxxxxxxx
 ```
-VITE_API_BASE_URL=https://so0hxmjon8.execute-api.ap-northeast-1.amazonaws.com
-```
-
-（開発プロキシを使う場合は `VITE_API_PROXY_TARGET=http://localhost:8000` を設定し、`VITE_API_BASE_URL` は未設定にします）
 
 4) 開発サーバー起動
 
 ```
 npm run dev -- --host
 ```
+
+## 認証とテナント管理
+
+本アプリは **AWS Amplify** を使用した Cognito 認証を実装しています。
+API へのリクエストには自動的に認証トークン（JWT）が付与されます。
+
+### ログイン
+- ユーザーは管理者（AWSコンソール等）によって作成・招待されます。
+- **自己登録（Sign Up）は無効化**されています。
+- ログイン時にユーザー属性 `custom:tenant_id` に基づいてテナント（例: `ueki`, `nespe`）が識別され、そのテナントのデータのみが表示・操作可能になります。
 
 ## ルーティング
 
@@ -99,12 +112,13 @@ npm run dev -- --host
 
 ## プロンプト（Markdown）運用
 
-- システムプロンプトは DynamoDB `ueki-prompts` に Markdown で保存され、`/chat` 呼び出し時に読み込まれます。
+- システムプロンプトは DynamoDB `app-prompts` に Markdown で保存され、`/chat` 呼び出し時に読み込まれます。
 
 例:
 ```
 EP=https://so0hxmjon8.execute-api.ap-northeast-1.amazonaws.com
-curl -s "$EP/prompt" | jq .
+# 認証ヘッダーが必要
+curl -s "$EP/prompt" -H "Authorization: Bearer <ID_TOKEN>" | jq .
 ```
 
 ## ディレクトリ
@@ -119,10 +133,11 @@ curl -s "$EP/prompt" | jq .
 - `src/shared/api/*`（共通 API クライアント）
 - `src/shared/types/*`（共通型）
 - `src/styles/*`（スタイル）
+- `src/shared/auth-fetch.ts`（認証付きフェッチラッパー）
 
 ## トラブルシューティング
 
 - Vite が起動するが警告が出る: Node 20.19+ 推奨。`nvm use 20.19.0` へ更新。
 - React Router の v7 警告: 絶対パス（`/chat` など）を使用しているため機能影響なし。無視可。
 - 500 / CORS エラー: `VITE_API_BASE_URL` を AWS に設定。新規エンドポイント（例 `/chat-logs`）追加後は数十秒待機してから再試行。
-
+- 401 Unauthorized: ログインセッションが切れている可能性があります。ページをリロードして再ログインしてください。

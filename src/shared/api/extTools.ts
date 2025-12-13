@@ -1,4 +1,4 @@
-import { getApiBase } from '../config'
+import { fetchJson } from '../auth-fetch'
 
 export type ExtTool = {
   name: string
@@ -14,19 +14,14 @@ export type ExtTool = {
 export type ExtToolsConfig = { ext_tools: ExtTool[] }
 
 export async function getExtTools(): Promise<{ ok: boolean; config?: ExtToolsConfig; error?: string }> {
-  const base = getApiBase()
-  const res = await fetch(`${base}/ext-tools`, { method: 'GET' })
-  return res.json()
+  return fetchJson<{ ok: boolean; config?: ExtToolsConfig; error?: string }>('/ext-tools')
 }
 
 export async function putExtTools(config: ExtToolsConfig): Promise<{ ok: boolean; error?: string }> {
-  const base = getApiBase()
-  const res = await fetch(`${base}/ext-tools`, {
+  return fetchJson<{ ok: boolean; error?: string }>('/ext-tools', {
     method: 'PUT',
-    headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ config }),
   })
-  return res.json()
 }
 
 

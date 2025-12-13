@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import '../styles/calllogs.css'
-import { getApiBase } from '../shared/config'
-import { listRecordings, recordingUrl, type RecordingItem } from '../shared/api/recordings'
+import { listRecordings, type RecordingItem } from '../shared/api/recordings'
 import { getTranscription } from '../shared/api/transcription'
 import { Pagination } from '../widgets/Pagination'
+import { AuthenticatedAudio } from '../widgets/AuthenticatedAudio'
+import { fetchJson, authFetch } from '../shared/auth-fetch'
 
 type PhonesResponse = { ok: boolean; phones?: string[]; items?: string[]; error?: string }
 type CallsResponse = { ok: boolean; items?: CallItem[]; calls?: CallItem[]; next_token?: string; error?: string }
@@ -13,15 +14,7 @@ type GroupedItem = { key: string; phone: string; callSid: string | null; latestT
 type ChatLogEvent = { timestamp?: number; ingestionTime?: number; message?: string; logStreamName?: string; eventId?: string }
 type ChatLogsResponse = { ok: boolean; items?: ChatLogEvent[]; error?: string }
 
-async function fetchJson<T>(baseUrl: string, path: string): Promise<T> {
-  if (!baseUrl) throw new Error('API Base URL is empty')
-  const resp = await fetch(`${baseUrl}${path}`)
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-  return resp.json() as Promise<T>
-}
-
 export default function CallLogsPage() {
-  const apiBase = getApiBase()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
 
@@ -69,7 +62,7 @@ export default function CallLogsPage() {
       params.set('limit', String(limitClamped))
       if (!reset && nextToken) params.set('next_token', nextToken)
 
-      const data = await fetchJson<CallsResponse>(apiBase, `/calls?${params.toString()}`)
+      const data = await fetchJson<CallsResponse>(`/calls?${params.toString()}`)
       if (!data.ok) throw new Error(data.error || 'Failed to load calls')
       const items = data.items || data.calls || []
       setNextToken(data.next_token || null)
@@ -86,14 +79,14 @@ export default function CallLogsPage() {
     try {
       setLoading(true)
       setError('')
-      const data = await fetchJson<PhonesResponse>(apiBase, '/phones')
+      const data = await fetchJson<PhonesResponse>('/phones')
       if (!data.ok) throw new Error(data.error || 'Failed to load phones')
       const list = (data.phones || data.items || []) as string[]
       const results = await Promise.allSettled(
         list.map(async (p) => {
           try {
             const q = new URLSearchParams({ phone: p, limit: '1', order: 'desc' })
-            const resp = await fetchJson<CallsResponse>(apiBase, `/calls?${q.toString()}`)
+            const resp = await fetchJson<CallsResponse>(`/calls?${q.toString()}`)
             const items = resp.items || resp.calls || []
             const latest = items[0]?.ts || null
             return { phone: p, latestTs: latest } as PhoneWithLatest
@@ -123,13 +116,9 @@ export default function CallLogsPage() {
   }
 
   useEffect(() => {
-    if (!apiBase) {
-      setError('API Base URL is not configured')
-      return
-    }
     loadPhonesWithLatest().catch((e) => setError(e instanceof Error ? e.message : String(e)))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiBase])
+  }, [])
 
   useEffect(() => {
     if (!selectedPhone) return
@@ -263,16 +252,12 @@ export default function CallLogsPage() {
   }, [calls, selectedPhone])
 
   async function onDeleteCall(phone: string, ts: string) {
-    if (!apiBase) {
-      setError('API Base URL is not configured')
-      return
-    }
     if (!confirm(`Delete call log?\nphone=${phone}\nts=${ts}`)) return
     setLoading(true)
     setError('')
     try {
       const q = new URLSearchParams({ phone, ts })
-      const res = await fetch(`${apiBase}/call?${q.toString()}`, { method: 'DELETE' })
+      const res = await authFetch(`/call?${q.toString()}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string }
       if (!res.ok || data.ok === false) {
         throw new Error(data.error || `HTTP ${res.status}`)
@@ -286,13 +271,13 @@ export default function CallLogsPage() {
   }
 
   async function onDeleteSession(callSid: string | null) {
-    if (!apiBase || !callSid) return
+    if (!callSid) return
     if (!confirm(`Delete entire session?\ncall_sid=${callSid}`)) return
     setLoading(true)
     setError('')
     try {
       const q = new URLSearchParams({ call_sid: callSid })
-      const res = await fetch(`${apiBase}/call?${q.toString()}`, { method: 'DELETE' })
+      const res = await authFetch(`/call?${q.toString()}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; deleted?: number }
       if (!res.ok || data.ok === false) {
         throw new Error(data.error || `HTTP ${res.status}`)
@@ -333,7 +318,7 @@ export default function CallLogsPage() {
         minutes = Math.min(60, spanMin + padMin * 2)
       }
       const q = new URLSearchParams({ startTimeMs: String(startMs), minutes: String(minutes), limit: '200' })
-      const data = await fetchJson<ChatLogsResponse>(apiBase, `/chat-logs?${q.toString()}`)
+      const data = await fetchJson<ChatLogsResponse>(`/chat-logs?${q.toString()}`)
       if (!data.ok) throw new Error(data.error || 'Failed to load logs')
       setLogsByKey(prev => ({ ...prev, [key]: data.items || [] }))
     } catch (e: unknown) {
@@ -552,7 +537,7 @@ export default function CallLogsPage() {
                             <div className="muted">duration</div>
                             <div className="mono">{r.duration ? `${r.duration}s` : '-'}</div>
                             <div style={{ gridColumn: '1 / -1' }}>
-                              <audio controls src={recordingUrl(r.sid, (r.media_format as any) || 'mp3')} style={{ width: '100%' }} />
+                              <AuthenticatedAudio sid={r.sid} format={(r.media_format as any) || 'mp3'} style={{ width: '100%' }} />
                             </div>
                           <div style={{ gridColumn: '1 / -1', marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
                             <button
